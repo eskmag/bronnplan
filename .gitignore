@@ -14,3 +14,7 @@ target/
 
 # Local tooling
 .github/modernize/
+
+# Python
+.venv/
+__pycache__/
