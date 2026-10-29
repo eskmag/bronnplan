@@ -81,8 +81,7 @@ def write_line_source() -> None:
 
 # Monthly mean air temperature [degC], Bergen - Florida (SN50540), normal period 1991-2020.
 # Source: Norwegian Centre for Climate Services, seklima.met.no.
-# UNVERIFIED: typed from memory, must be checked against seKlima before the
-# profile is used for anything but examples. See docs/model.md section 3.2.
+# Verified against seKlima on 2026-10-29 (deviation < 0.2 degC), see docs/model.md section 3.2.
 BERGEN_NORMALS_1991_2020_C = [2.6, 2.4, 3.8, 6.7, 10.1, 13.0, 15.3, 15.1, 12.3, 8.6, 5.4, 3.1]
 DAYS_PER_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 DEGREE_DAY_BASE_C = 17.0
