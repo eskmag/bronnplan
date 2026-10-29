@@ -102,6 +102,33 @@ class LineSourceTest {
     }
 
     @Test
+    void validityLimitIsAboutThreeAndAHalfHoursForTypicalBorehole() {
+        // 5 · 0.0575² / (3.0 / 2.2e6) = 12 123 s ≈ 3.37 h, see docs/model.md §2
+        double limit = LineSource.validityTime(GRANITE, BOREHOLE.radius());
+
+        assertThat(limit).isCloseTo(5 * 0.0575 * 0.0575 * 2.2e6 / 3.0, within(1e-9));
+        assertThat(limit / 3600.0).isBetween(3.3, 3.4);
+    }
+
+    @Test
+    void isValidOnlyAfterValidityLimit() {
+        double limit = LineSource.validityTime(GRANITE, BOREHOLE.radius());
+
+        assertThat(LineSource.isValid(GRANITE, BOREHOLE.radius(), 0.99 * limit)).isFalse();
+        assertThat(LineSource.isValid(GRANITE, BOREHOLE.radius(), limit)).isFalse();
+        assertThat(LineSource.isValid(GRANITE, BOREHOLE.radius(), 1.01 * limit)).isTrue();
+        assertThat(LineSource.isValid(GRANITE, BOREHOLE.radius(), 730 * 3600.0)).isTrue();
+    }
+
+    @Test
+    void validationMessagesNameParameterAndUnit() {
+        assertThatIllegalArgumentException().isThrownBy(() -> new GroundProperties(-1.0, 2.2e6, 7.5))
+                .withMessageContaining("conductivity [W/(m·K)]");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Borehole(0.0575, -0.1))
+                .withMessageContaining("thermalResistance [m·K/W]");
+    }
+
+    @Test
     void diffusivityIsConductivityOverVolumetricHeatCapacity() {
         assertThat(GRANITE.diffusivity()).isCloseTo(3.0 / 2.2e6, within(1e-20));
     }
