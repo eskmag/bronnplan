@@ -10,11 +10,11 @@ public record Borehole(double radius, double thermalResistance) {
 
     public Borehole {
         if (!(radius > 0.0) || Double.isInfinite(radius)) {
-            throw new IllegalArgumentException("radius must be positive and finite, got " + radius);
+            throw new IllegalArgumentException("radius [m] must be positive and finite, got " + radius);
         }
         if (!(thermalResistance >= 0.0) || Double.isInfinite(thermalResistance)) {
             throw new IllegalArgumentException(
-                    "thermalResistance must be non-negative and finite, got " + thermalResistance);
+                    "thermalResistance [m·K/W] must be non-negative and finite, got " + thermalResistance);
         }
     }
 }

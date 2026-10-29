@@ -23,13 +23,34 @@ public final class LineSource {
      */
     public static double responseFactor(GroundProperties ground, double r, double t) {
         if (!(r > 0.0)) {
-            throw new IllegalArgumentException("r must be positive, got " + r);
+            throw new IllegalArgumentException("r [m] must be positive, got " + r);
         }
         if (!(t > 0.0)) {
-            throw new IllegalArgumentException("t must be positive, got " + t);
+            throw new IllegalArgumentException("t [s] must be positive, got " + t);
         }
         double x = r * r / (4.0 * ground.diffusivity() * t);
         return ExponentialIntegral.e1(x) / (4.0 * Math.PI * ground.conductivity());
+    }
+
+    /**
+     * Earliest time at which the line source is a good approximation, t = 5·r²/α (Eskilson 1987).
+     * Before this, the borehole's own radius and heat capacity matter.
+     *
+     * @param r distance from the line source, normally r_b [m]
+     * @return validity limit [s]
+     */
+    public static double validityTime(GroundProperties ground, double r) {
+        return 5.0 * r * r / ground.diffusivity();
+    }
+
+    /**
+     * Whether t is past {@link #validityTime}. Used to raise warnings, not to stop a calculation.
+     *
+     * @param r distance from the line source, normally r_b [m]
+     * @param t time since the extraction started [s]
+     */
+    public static boolean isValid(GroundProperties ground, double r, double t) {
+        return t > validityTime(ground, r);
     }
 
     /**

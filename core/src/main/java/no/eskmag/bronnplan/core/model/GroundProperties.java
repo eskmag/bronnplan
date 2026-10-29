@@ -11,14 +11,14 @@ public record GroundProperties(double conductivity, double volumetricHeatCapacit
 
     public GroundProperties {
         if (!(conductivity > 0.0) || Double.isInfinite(conductivity)) {
-            throw new IllegalArgumentException("conductivity must be positive and finite, got " + conductivity);
+            throw new IllegalArgumentException("conductivity [W/(m·K)] must be positive and finite, got " + conductivity);
         }
         if (!(volumetricHeatCapacity > 0.0) || Double.isInfinite(volumetricHeatCapacity)) {
             throw new IllegalArgumentException(
-                    "volumetricHeatCapacity must be positive and finite, got " + volumetricHeatCapacity);
+                    "volumetricHeatCapacity [J/(m³·K)] must be positive and finite, got " + volumetricHeatCapacity);
         }
         if (!Double.isFinite(undisturbedTemperature)) {
-            throw new IllegalArgumentException("undisturbedTemperature must be finite, got " + undisturbedTemperature);
+            throw new IllegalArgumentException("undisturbedTemperature [°C] must be finite, got " + undisturbedTemperature);
         }
     }
 

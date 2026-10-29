@@ -18,3 +18,7 @@ target/
 # Python
 .venv/
 __pycache__/
+
+# Private project notes (not published)
+docs/
+CLAUDE.md
