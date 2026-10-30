@@ -39,6 +39,13 @@ public record LoadSchedule(List<LoadStep> steps, double endTimeSeconds) {
     }
 
     /**
+     * End of step i: the start of the next step, or the end of the design period for the last step [s].
+     */
+    public double stepEndSeconds(int i) {
+        return i + 1 < steps.size() ? steps.get(i + 1).startTimeSeconds() : endTimeSeconds;
+    }
+
+    /**
      * @param load  the building's heat demand
      * @param years design period [years], &ge; 1
      */
