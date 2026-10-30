@@ -65,6 +65,27 @@ class LoadScheduleTest {
     }
 
     @Test
+    void peakReplacesTheMonthlyMeanInsteadOfAddingToIt() {
+        int years = 25;
+        var steps = LoadSchedule.build(LOAD, years).steps();
+        int peak = (years - 1) * 12 + LOAD.monthlyProfile().coldestMonth() + 1;
+
+        // January mean is 2 731 W, design power from the ground is 5 333 W: the peak is 5 333 W, not 8 064 W.
+        assertThat(steps.get(peak).groundPowerW()).isCloseTo(LOAD.peakGroundPowerW(), within(1e-9));
+    }
+
+    @Test
+    void peakBelowMonthlyMeanLeavesThePowerUnchanged() {
+        var weakPeak = new BuildingLoad(20_000.0, 0.5, 3.5, 3.0, MonthlyProfile.bergenDegreeDays());
+        int years = 2;
+        var steps = LoadSchedule.build(weakPeak, years).steps();
+        int peak = (years - 1) * 12 + weakPeak.monthlyProfile().coldestMonth() + 1;
+
+        assertThat(weakPeak.peakGroundPowerW()).isLessThan(steps.get(peak - 1).groundPowerW());
+        assertThat(steps.get(peak).groundPowerW()).isEqualTo(steps.get(peak - 1).groundPowerW());
+    }
+
+    @Test
     void peakIsAlsoPresentInOneYearSchedule() {
         var steps = LoadSchedule.build(LOAD, 1).steps();
 

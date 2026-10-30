@@ -67,7 +67,8 @@ public record LoadSchedule(List<LoadStep> steps, double endTimeSeconds) {
     /**
      * Adds the 6-hour design-power peak at the end of the month that starts at monthStart. The month's own
      * step is already the last element of steps; the next month's step, added after this method returns,
-     * ends the peak. See docs/model.md §3.3.
+     * ends the peak. The design power replaces the monthly mean during the peak, it is not added to it.
+     * See docs/model.md §3.3.
      *
      * @param monthStart    start of the peak month [s]
      * @param monthlyPowerW mean ground power in the peak month [W]
@@ -76,8 +77,8 @@ public record LoadSchedule(List<LoadStep> steps, double endTimeSeconds) {
     static void addPeak(List<LoadStep> steps, double monthStart, double monthlyPowerW, double peakPowerW) {
         // At the end of the month the ground has been cooled by the whole month's load, so this gives the lowest T_f.
         double peakStart = monthStart + Units.SECONDS_PER_MONTH - PEAK_DURATION_SECONDS;
-        // The peak comes on top of the monthly mean (as in the ASHRAE method): conservative, and the extra
-        // energy over 6 hours is negligible compared with the month.
-        steps.add(new LoadStep(peakStart, monthlyPowerW + peakPowerW));
+        // The design power is the total load in those hours, and the monthly mean is made up of the same
+        // operation. Adding the two would count the load twice (three-pulse method: pulses are q_h − q_m).
+        steps.add(new LoadStep(peakStart, Math.max(monthlyPowerW, peakPowerW)));
     }
 }
