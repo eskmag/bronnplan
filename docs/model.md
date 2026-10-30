@@ -183,3 +183,79 @@ toppen erstatter middelet (ikke summen), og starttidene er strengt voksende. `Un
 
 `DesignCriteria(minFluidTempC, years)` har standardverdien −3 °C over 25 år (`DesignCriteria.defaults()`).
 Kravet `T_min < T₀` sjekkes i `SizingInputs`, fordi det trenger både kriteriet og berget.
+
+## 4. Superposisjon og dimensjonering
+
+### 4.1 Temporal superposisjon
+
+Lasten er stykkevis konstant (§3.3). Responsen fra hvert lasttrinn summeres:
+
+```
+S(t) = Σ_{i: t_i < t} (Q_i − Q_{i−1}) · G(r_b, t − t_i)      [m·K]
+```
+
+`Q_i` er effekten fra berget for hele brønnen [W], og `Q_{−1} = 0`. Delt på dybden `H` gir `S` et temperaturfall i kelvin.
+
+**Konvensjon:** Steg i gjelder på `(t_i, t_{i+1}]`. Ved slutten av et steg gjelder steget fortsatt, og neste
+steg har ikke startet. Derfor evalueres `G` aldri ved tid null, og serien ved månedsslutt er entydig.
+
+**Implementasjon:** `core/.../sizing/Superposition.java` (`powerAt`, `responseAt`).
+**Kilde:** Eskilson (1987), temporal superposisjon av trinnresponser. Carslaw & Jaeger for linjekilden.
+**Test:** `SuperpositionTest`: ett steg er lik linjekilden, to steg regnet for hånd, konvensjonen ved
+`t = t_{i+1}`, linearitet, null last og at berget henter seg inn etter at lasten slås av.
+
+**Ytelse:** Én evaluering er O(n). Hele serien er O(n²), men med 301 steg er det ca. 45 000 E1-kall.
+Timesoppløsning (~219 000 steg) krever lastaggregering eller FFT (ikke implementert).
+
+### 4.2 Fluidtemperatur
+
+```
+L(t)   = Q(t)·R_b + S(t)            [m·K]
+T_f(t) = T₀ − L(t) / H              [°C]
+```
+
+`T_f` er lineær i `1/H`. Det er dette som gir dimensjoneringen en lukket form.
+
+**Implementasjon:** `core/.../sizing/FluidTemperature.java` (`loadTerm`, `at`, `series`). Serien har ett punkt
+ved slutten av hvert steg: hver månedsslutt og slutten av effekttoppen (301 punkter for 25 år).
+**Test:** `FluidTemperatureTest`: konstant last er lik `LineSource.fluidTemperature`, null last gir `T₀`,
+fallet er omvendt proporsjonalt med `H`, og det kaldeste punktet er effekttoppen.
+
+### 4.3 Dimensjonering (lukket form)
+
+Minste dybde `H` slik at `T_f(t) ≥ T_min` over hele perioden:
+
+```
+H = max_t L(t) / (T₀ − T_min)
+```
+
+Maksimum tas over slutten av alle steg. Innenfor et steg er `Q` konstant. Etter en lastøkning vokser
+responsen mot slutten av steget, og etter en lastreduksjon henter berget seg inn. Det er ikke bevist for alle
+lastformer, så `SizerTest` sjekker det mot et tett tidsgitter med 20 punkter per steg.
+
+`Sizer` returnerer `SizingResult(requiredDepthM, minFluidTempC, monthOfMinimum, series, warnings, modelVersion)`.
+`minFluidTempC` er lik `T_min` per konstruksjon. `monthOfMinimum` er 0-basert over perioden, så 288 er
+januar i år 25.
+
+**Inndatakrav:** `T_min < T₀` (`SizingInputs`). Ellers finnes ingen løsning.
+
+**Advarsler** (stopper ikke beregningen):
+- `H > 300 m`: kjernen modellerer én brønn. Anbefal flere brønner.
+- Korteste laststeg er kortere enn gyldighetsgrensen `5·r_b²/α` (§2). Normalt er det effekttoppen på 6 t mot
+  ca. 3,4 t, så advarselen slår bare til ved uvanlige verdier.
+
+**Implementasjon:** `core/.../sizing/Sizer.java`, `SizingInputs.java`, `SizingResult.java`.
+**Test:** `SizerTest`: H gir nøyaktig `T_min` (toleranse 1e-9), bisection på H som uavhengig kryssjekk
+(1e-6 m), tett tidsgitter, egenskaper (dypere brønn gir varmere fluid, høyere λ gir grunnere brønn, lengre
+periode og større topp gir dypere brønn) og advarsler. `SizerReferenceTest` mot Python, se `docs/validation.md`.
+
+**Når lukket form ikke lenger holder:** Med endelig brønnlengde (g-funksjoner) eller flere brønner er ikke
+`T_f` lenger lineær i `1/H`. Da blir bisection hovedløseren.
+
+### 4.4 Kjente begrensninger
+
+- Uendelig linjekilde: endelig brønnlengde er ikke modellert. Over 25 år overvurderer det temperaturfallet,
+  altså konservativt (gir for dyp brønn). Størrelsen er ikke tallfestet ennå.
+- Én brønn, homogent berg, ingen grunnvannsstrøm og konstant `R_b`.
+- Månedsoppløsning med 730 timer per måned og én effekttopp på 6 timer.
+- Ingen kjøling eller frikjøling.
