@@ -29,6 +29,13 @@ class ExponentialIntegralTest {
     }
 
     @Test
+    void knownValuesOnBothSidesOfTheSwitch() {
+        // E1(0.1) ≈ 1.822924 (series), E1(10) ≈ 4.15697e-6 (continued fraction); digits from scipy.special.exp1
+        assertThat(relativeError(ExponentialIntegral.e1(0.1), 1.8229239584193906)).isLessThan(1e-14);
+        assertThat(relativeError(ExponentialIntegral.e1(10.0), 4.156968929685325e-6)).isLessThan(1e-14);
+    }
+
+    @Test
     void approachesLogarithmicAsymptoteForSmallX() {
         // E1(x) ≈ -γ - ln x for x → 0; the next term is +x, so the gap is ~1e-10 here.
         double x = 1e-10;

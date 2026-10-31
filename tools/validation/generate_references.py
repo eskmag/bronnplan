@@ -101,8 +101,81 @@ def print_bergen_profile() -> None:
     print(f"    sum = {sum(fractions):.12f}")
 
 
+HOURS_PER_MONTH = 8760.0 / 12
+SECONDS_PER_MONTH = HOURS_PER_MONTH * 3600.0
+PEAK_SECONDS = 6 * 3600.0
+
+# (name, annual heat kWh, peak heat kW, SCOP, COP_peak, lambda, rho_c, T0, r_b, R_b, T_min, years)
+SIZING_SCENARIOS = [
+    ("house_bergen", 20_000.0, 8.0, 3.5, 3.0, 3.0, 2.2e6, 7.5, 0.0575, 0.10, -3.0, 25),
+    ("poor_rock_high_load", 35_000.0, 14.0, 3.2, 2.8, 2.5, 2.2e6, 6.5, 0.0575, 0.12, -3.0, 25),
+    ("large_house", 45_000.0, 12.0, 4.0, 3.2, 3.0, 2.2e6, 7.5, 0.0575, 0.08, -3.0, 25),
+    ("house_ten_years", 20_000.0, 8.0, 3.5, 3.0, 3.0, 2.2e6, 7.5, 0.0575, 0.10, -3.0, 10),
+]
+
+
+def load_schedule(annual_kwh, peak_kw, scop, cop_peak, years, fractions):
+    """Monthly steps (730 h) plus a 6-hour peak at the end of the coldest month of the last year.
+
+    The peak power is max(monthly mean, design ground power): it replaces the mean, it is not added.
+    """
+    ground_kwh = annual_kwh * (1.0 - 1.0 / scop)
+    peak_w = peak_kw * 1000.0 * (1.0 - 1.0 / cop_peak)
+    coldest = int(np.argmax(fractions))
+    starts, powers = [], []
+    for year in range(years):
+        for month in range(12):
+            start = (year * 12 + month) * SECONDS_PER_MONTH
+            power = ground_kwh * fractions[month] * 3.6e6 / SECONDS_PER_MONTH
+            starts.append(start)
+            powers.append(power)
+            if year == years - 1 and month == coldest:
+                starts.append(start + SECONDS_PER_MONTH - PEAK_SECONDS)
+                powers.append(max(power, peak_w))
+    return np.array(starts), np.array(powers), years * 12 * SECONDS_PER_MONTH
+
+
+def closed_form_depth(starts, powers, end, lam, rho_c, r_b, res_b, t0, t_min):
+    """H = max over step ends of [Q(t) R_b + sum dQ_i G(t - t_i)] / (T0 - T_min).
+
+    Step i is in force on (t_i, t_{i+1}], so at the end of step i only steps 0..i contribute.
+    """
+    alpha = lam / rho_c
+    increments = np.diff(np.concatenate([[0.0], powers]))
+    ends = np.append(starts[1:], end)
+    load_terms = []
+    for i, t in enumerate(ends):
+        ages = t - starts[: i + 1]
+        g = exp1(r_b * r_b / (4.0 * alpha * ages)) / (4.0 * np.pi * lam)
+        load_terms.append(powers[i] * res_b + np.dot(increments[: i + 1], g))
+    worst = int(np.argmax(load_terms))
+    month_of_min = int(np.ceil(ends[worst] / SECONDS_PER_MONTH - 1e-9)) - 1
+    return load_terms[worst] / (t0 - t_min), month_of_min
+
+
+def write_sizing() -> None:
+    # Same 9-decimal table as MonthlyProfile.bergenDegreeDays(), so both sides use identical fractions.
+    fractions = [round(f, 9) for f in degree_day_fractions(BERGEN_NORMALS_1991_2020_C)]
+    path = OUT_DIR / "sizing_scipy.csv"
+    with path.open("w", newline="") as f:
+        header(f, "Closed-form single borehole sizing, Bergen degree-day profile, 730 h months, 6 h peak")
+        w = csv.writer(f)
+        w.writerow(["name", "annual_heat_kwh", "peak_heat_kw", "scop", "cop_peak",
+                    "conductivity_w_per_mk", "volumetric_heat_capacity_j_per_m3k", "undisturbed_temp_c",
+                    "borehole_radius_m", "borehole_resistance_mk_per_w", "min_fluid_temp_c", "years",
+                    "required_depth_m", "month_of_minimum"])
+        for (name, q, p, scop, cop, lam, rho_c, t0, r_b, res_b, t_min, years) in SIZING_SCENARIOS:
+            starts, powers, end = load_schedule(q, p, scop, cop, years, fractions)
+            depth, month = closed_form_depth(starts, powers, end, lam, rho_c, r_b, res_b, t0, t_min)
+            w.writerow([name] + [repr(float(v)) for v in (q, p, scop, cop, lam, rho_c, t0, r_b, res_b, t_min)]
+                       + [years, repr(float(depth)), month])
+            print(f"{name}: H = {depth:.2f} m, minimum in month {month}")
+    print(f"wrote {len(SIZING_SCENARIOS)} rows to {path}")
+
+
 if __name__ == "__main__":
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     write_e1()
     write_line_source()
+    write_sizing()
     print_bergen_profile()

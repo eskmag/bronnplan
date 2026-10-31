@@ -53,6 +53,15 @@ class LineSourceTest {
     }
 
     @Test
+    void responseFactorIsPositiveAndVanishesAsTimeGoesToZero() {
+        double atOneSecond = LineSource.responseFactor(GRANITE, BOREHOLE.radius(), 1.0);
+        double atOneMillisecond = LineSource.responseFactor(GRANITE, BOREHOLE.radius(), 1e-3);
+
+        assertThat(atOneSecond).isPositive().isLessThan(1e-100);
+        assertThat(atOneMillisecond).isGreaterThanOrEqualTo(0.0).isLessThan(atOneSecond);
+    }
+
+    @Test
     void temperatureChangeFallsWithDistance() {
         double t = SECONDS_PER_YEAR;
         double atWall = LineSource.temperatureChange(GRANITE, 30.0, 0.0575, t);

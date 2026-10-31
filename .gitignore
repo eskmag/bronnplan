@@ -19,6 +19,8 @@ target/
 .venv/
 __pycache__/
 
-# Private project notes (not published)
-docs/
+# Private project notes (not published); only the model and validation docs are public
+docs/*
+!docs/model.md
+!docs/validation.md
 CLAUDE.md
